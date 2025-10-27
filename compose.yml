@@ -1,0 +1,65 @@
+services:
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: flask-webapp
+    ports:
+      - "5003:5000"
+    environment:
+      - POSTGRES_HOST=database
+      - POSTGRES_DB=myapp
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secretpassword
+      - REDIS_HOST=cache
+    depends_on:
+      - database
+      - cache
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  database:
+    image: postgres:15-alpine
+    container_name: postgres-database
+    environment:
+      - POSTGRES_DB=myapp
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secretpassword
+    volumes:
+      - postgres-storage:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  cache:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-storage:/data
+    networks:
+      - backend-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  backend-network:
+    driver: bridge
+
+volumes:
+  postgres-storage:
+  redis-storage:
